@@ -47,6 +47,11 @@ public class Keyboard2 extends InputMethodService
   private ViewGroup _emojiPane = null;
   private ViewGroup _clipboard_pane = null;
   private Handler _handler;
+  private boolean _hw_compose_active = false;
+  private int _hw_compose_state = ComposeKeyData.compose;
+  private boolean _hw_altgr_held = false;
+  private boolean _hw_altgr_combo = false;
+  private KeyValue _hw_compose_kv = null;
 
   private Config _config;
 
@@ -229,6 +234,7 @@ public class Keyboard2 extends InputMethodService
   @Override
   public void onStartInputView(EditorInfo info, boolean restarting)
   {
+    if (_hw_compose_active) hw_compose_exit();
     _config.editor_config.refresh(info, getResources());
     refresh_config();
     _currentSpecialLayout = refresh_special_layout();
@@ -334,7 +340,78 @@ public class Keyboard2 extends InputMethodService
   public void onFinishInputView(boolean finishingInput)
   {
     super.onFinishInputView(finishingInput);
+    if (_hw_compose_active) hw_compose_exit();
     _keyboard_layout_view.reset();
+  }
+
+  @Override
+  public boolean onKeyDown(int keyCode, KeyEvent event)
+  {
+    if (keyCode == KeyEvent.KEYCODE_ALT_RIGHT)
+    {
+      _hw_altgr_held = true;
+      _hw_altgr_combo = false;
+      return true;
+    }
+    if (_hw_altgr_held)
+    {
+      _hw_altgr_combo = true;
+      return super.onKeyDown(keyCode, event);
+    }
+    if (_hw_compose_active)
+      return true;
+    return super.onKeyDown(keyCode, event);
+  }
+
+  @Override
+  public boolean onKeyUp(int keyCode, KeyEvent event)
+  {
+    if (keyCode == KeyEvent.KEYCODE_ALT_RIGHT)
+    {
+      _hw_altgr_held = false;
+      if (_hw_altgr_combo)
+        return super.onKeyUp(keyCode, event);
+      if (_hw_compose_active)
+        hw_compose_exit();
+      else
+        hw_compose_enter();
+      return true;
+    }
+    if (!_hw_compose_active)
+      return super.onKeyUp(keyCode, event);
+    if (event.getKeyCode() == KeyEvent.KEYCODE_SHIFT_LEFT
+        || event.getKeyCode() == KeyEvent.KEYCODE_SHIFT_RIGHT
+        || event.getKeyCode() == KeyEvent.KEYCODE_CTRL_LEFT
+        || event.getKeyCode() == KeyEvent.KEYCODE_CTRL_RIGHT
+        || event.getKeyCode() == KeyEvent.KEYCODE_ALT_LEFT
+        || event.getKeyCode() == KeyEvent.KEYCODE_META_LEFT
+        || event.getKeyCode() == KeyEvent.KEYCODE_META_RIGHT)
+      return true;
+    int unicodeChar = event.getUnicodeChar(event.getMetaState());
+    if (unicodeChar == 0)
+    {
+      hw_compose_exit();
+      return super.onKeyUp(keyCode, event);
+    }
+    char c = (char)unicodeChar;
+    KeyValue result = ComposeKey.apply(_hw_compose_state, c);
+    if (result == null)
+    {
+      hw_compose_exit();
+      return true;
+    }
+    if (result.getKind() == KeyValue.Kind.Compose_pending)
+    {
+      _hw_compose_state = result.getPendingCompose();
+      _keyboard_layout_view.update_compose_pending(_hw_compose_kv, result);
+      _hw_compose_kv = result;
+      return true;
+    }
+    InputConnection conn = getCurrentInputConnection();
+    if (conn != null)
+      conn.commitText(result.getString(), 1);
+    hw_compose_exit();
+    return true;
   }
 
   @Override
@@ -371,6 +448,21 @@ public class Keyboard2 extends InputMethodService
     Intent intent = new Intent(this, cls);
     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
     startActivity(intent);
+  }
+
+  private void hw_compose_enter()
+  {
+    _hw_compose_active = true;
+    _hw_compose_state = ComposeKeyData.compose;
+    _hw_compose_kv = KeyValue.COMPOSE;
+    _keyboard_layout_view.set_compose_pending(true);
+  }
+
+  private void hw_compose_exit()
+  {
+    _hw_compose_active = false;
+    _keyboard_layout_view.update_compose_pending(_hw_compose_kv, null);
+    _hw_compose_kv = null;
   }
 
   /** Not static */

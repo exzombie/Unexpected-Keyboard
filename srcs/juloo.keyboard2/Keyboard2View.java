@@ -141,6 +141,15 @@ public class Keyboard2View extends View
     set_fake_ptr_latched(_compose_key, KeyValue.COMPOSE, pending, false);
   }
 
+  void update_compose_pending(KeyValue old_compose, KeyValue new_compose)
+  {
+    if (_compose_key == null)
+      return;
+    set_fake_ptr_latched(_compose_key, old_compose, false, false);
+    if (new_compose != null)
+      set_fake_ptr_latched(_compose_key, new_compose, true, false);
+  }
+
   /** Called from [Keybard2.onUpdateSelection].  */
   public void set_selection_state(boolean selection_state)
   {
