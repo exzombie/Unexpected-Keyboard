@@ -47,7 +47,6 @@ public class Keyboard2 extends InputMethodService
   private ViewGroup _emojiPane = null;
   private ViewGroup _clipboard_pane = null;
   private Handler _handler;
-  private boolean _hw_compose_active = false;
   private int _hw_compose_state = ComposeKeyData.compose;
   private boolean _hw_altgr_held = false;
   private boolean _hw_altgr_combo = false;
@@ -234,7 +233,7 @@ public class Keyboard2 extends InputMethodService
   @Override
   public void onStartInputView(EditorInfo info, boolean restarting)
   {
-    if (_hw_compose_active) hw_compose_exit();
+    if (_hw_compose_kv != null) hw_compose_exit();
     _config.editor_config.refresh(info, getResources());
     refresh_config();
     _currentSpecialLayout = refresh_special_layout();
@@ -340,7 +339,7 @@ public class Keyboard2 extends InputMethodService
   public void onFinishInputView(boolean finishingInput)
   {
     super.onFinishInputView(finishingInput);
-    if (_hw_compose_active) hw_compose_exit();
+    if (_hw_compose_kv != null) hw_compose_exit();
     _keyboard_layout_view.reset();
   }
 
@@ -358,7 +357,7 @@ public class Keyboard2 extends InputMethodService
       _hw_altgr_combo = true;
       return super.onKeyDown(keyCode, event);
     }
-    if (_hw_compose_active)
+    if (_hw_compose_kv != null)
       return true;
     return super.onKeyDown(keyCode, event);
   }
@@ -371,21 +370,15 @@ public class Keyboard2 extends InputMethodService
       _hw_altgr_held = false;
       if (_hw_altgr_combo)
         return super.onKeyUp(keyCode, event);
-      if (_hw_compose_active)
+      if (_hw_compose_kv != null)
         hw_compose_exit();
       else
         hw_compose_enter();
       return true;
     }
-    if (!_hw_compose_active)
+    if (_hw_compose_kv == null)
       return super.onKeyUp(keyCode, event);
-    if (event.getKeyCode() == KeyEvent.KEYCODE_SHIFT_LEFT
-        || event.getKeyCode() == KeyEvent.KEYCODE_SHIFT_RIGHT
-        || event.getKeyCode() == KeyEvent.KEYCODE_CTRL_LEFT
-        || event.getKeyCode() == KeyEvent.KEYCODE_CTRL_RIGHT
-        || event.getKeyCode() == KeyEvent.KEYCODE_ALT_LEFT
-        || event.getKeyCode() == KeyEvent.KEYCODE_META_LEFT
-        || event.getKeyCode() == KeyEvent.KEYCODE_META_RIGHT)
+    if (KeyEvent.isModifierKey(keyCode))
       return true;
     int unicodeChar = event.getUnicodeChar(event.getMetaState());
     if (unicodeChar == 0)
@@ -452,7 +445,6 @@ public class Keyboard2 extends InputMethodService
 
   private void hw_compose_enter()
   {
-    _hw_compose_active = true;
     _hw_compose_state = ComposeKeyData.compose;
     _hw_compose_kv = KeyValue.COMPOSE;
     _keyboard_layout_view.set_compose_pending(true);
@@ -460,7 +452,6 @@ public class Keyboard2 extends InputMethodService
 
   private void hw_compose_exit()
   {
-    _hw_compose_active = false;
     _keyboard_layout_view.update_compose_pending(_hw_compose_kv, null);
     _hw_compose_kv = null;
   }
