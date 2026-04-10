@@ -358,7 +358,11 @@ public class Keyboard2 extends InputMethodService
       return super.onKeyDown(keyCode, event);
     }
     if (_hw_compose_kv != null)
+    {
+      if (KeyEvent.isModifierKey(keyCode))
+        return super.onKeyDown(keyCode, event);
       return true;
+    }
     return super.onKeyDown(keyCode, event);
   }
 
@@ -379,7 +383,7 @@ public class Keyboard2 extends InputMethodService
     if (_hw_compose_kv == null)
       return super.onKeyUp(keyCode, event);
     if (KeyEvent.isModifierKey(keyCode))
-      return true;
+      return super.onKeyUp(keyCode, event);
     int unicodeChar = event.getUnicodeChar(event.getMetaState());
     if (unicodeChar == 0)
     {
